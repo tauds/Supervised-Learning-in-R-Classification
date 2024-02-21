@@ -1,0 +1,274 @@
+########################################################################
+#kNN
+########################################################################
+library(class)
+pred <- knn(training_data, testing_data, training_labels)
+#training_data has n columns (without y's)
+#testing_data has n columns (without y's)
+#trainng_labels (column of y values)
+
+# Check r10's average red level by sign type
+aggregate(r10 ~ sign_type, data = signs, mean)
+
+# Create a confusion matrix of the actual versus predicted values
+signs_pred <- knn(train = signs[-1], test = test_signs[-1], cl = sign_types)
+table(signs_pred, signs_actual)
+
+# Compute the accuracy
+mean(signs_pred == signs_actual)
+
+#choosing k:
+#small k small neighborhoods
+#larger k more general (less variance, more bias)
+#rule of thumb: sqrt(number of observations)
+
+########################################################################
+#kNN - Choosing k
+########################################################################
+# Compute the accuracy of the baseline model (default k = 1)
+k_1 <- knn(train = signs[,-1], test = signs_test[,-1], cl = signs[,1])
+mean(k_1 == signs_test[,1]) # 0.9322034
+
+# Modify the above to set k = 7
+k_7 <- knn(train = signs[,-1], test = signs_test[,-1], cl = signs[,1], k = 7)
+mean(k_7 == signs_test[,1]) # 0.9322034
+
+# Set k = 15 and compare to the above
+k_15 <- knn(train = signs[,-1], test = signs_test[,-1], cl = signs[,1], k = 15)
+mean(k_15 == signs_test[,1]) # 0.9322034
+
+########################################################################
+#Seeing how the neighbors voted
+########################################################################
+# Use the prob parameter to get the proportion of votes for the winning class
+sign_pred <- knn(signs[,-1], signs_test[,-1], signs[,1], k = 7, prob = TRUE)
+
+# Get the "prob" attribute from the predicted classes
+sign_prob <- attr(sign_pred, "prob")
+
+# Examine the first several predictions
+head(sign_pred)
+
+# Examine the proportion of votes for the winning class
+head(sign_prob)
+
+########################################################################
+#Categorical Inputs for kNN (one-hot encoding/dummy encoding)
+########################################################################
+
+########################################################################
+#kNN benefits from normalized data
+########################################################################
+#e.g. two types of data: 0-255 blue & 0-1 rectangle (because of distance metric)
+#normalizing blue between 0-1 fixes this
+
+########################################################################
+#Understanding Bayesian Methods (Naive Bayes)
+########################################################################
+#P(A|B) = P(A&B) / P(B)
+
+#Building a Naive Bayes model
+library(naivebayes)
+m <- naive_bayes(location ~ time_of_day, data = location_history)
+#making predictions with Naive Bayes
+future_location <- predict(m, future_conditions)
+
+########################################################################
+#Examining a priori and posterior probabilities
+########################################################################
+print(naive_bayes_model) #print a priori and conditional probabilities
+
+# Obtain the predicted probabilities for Thursday at 9am
+predict(locmodel, thursday9am , type = "prob")
+#      appointment   campus      home    office
+#[1,]  0.01538462 0.1538462 0.2307692    0.6
+
+# Obtain the predicted probabilities for Saturday at 9am
+predict(locmodel, saturday9am , type = "prob")
+
+########################################################################
+#Understanding NB's "naivety" & Laplace Correction
+########################################################################
+
+# Build a new model using the Laplace correction
+locmodel2 <- naive_bayes(location ~ daytype + hourtype, data = locations, laplace = 1)
+# Observe the new predicted probabilities for a weekend afternoon
+predict(locmodel2, weekend_afternoon, type = "prob")
+
+########################################################################
+#Plotting ROC and AUC for logistic regression
+########################################################################
+
+# Load the pROC package
+library(pROC)
+
+# Create a ROC curve
+ROC <- roc(donors$donated, donors$donation_prob)
+
+# Plot the ROC curve
+plot(ROC, col = "blue")
+
+# Calculate the area under the curve (AUC)
+auc(ROC)
+
+#when the AUC values are very close, we need to think about which one is the better model more
+
+########################################################################
+#Building a Stepwise Regression Model
+########################################################################
+# Specify a null model with no predictors
+null_model <- glm(donated ~ 1, data = donors, family = "binomial")
+
+# Specify the full model using all of the potential predictors
+full_model <- glm(donated ~ ., data = donors, family = "binomial")
+
+# Use a forward stepwise algorithm to build a parsimonious model
+step_model <- step(null_model, scope = list(lower = null_model, upper = full_model), direction = "forward")
+
+# Estimate the stepwise donation probability
+step_prob <- predict(step_model, type = "response")
+
+# Plot the ROC of the stepwise model
+library(pROC)
+ROC <- roc(donors$donated, step_prob)
+plot(ROC, col = "red")
+auc(ROC)
+
+########################################################################
+#Decision Trees
+########################################################################
+library(rpart)
+model <- rpart(outcome ~ loan_amount + credit_score, data = loans, method = "class")
+p <- predict(m, test_data, type = "class")
+
+########################################################################
+#EX
+
+# Load the rpart package
+library(rpart)
+
+# Build a lending model predicting loan outcome versus loan amount and credit score
+loan_model <- rpart(outcome ~ loan_amount + credit_score, data = loans, method = "class", control = rpart.control(cp = 0))
+
+# Make a prediction for someone with good credit
+predict(loan_model, good_credit, type = "class")
+
+# Make a prediction for someone with bad credit
+predict(loan_model, bad_credit, type = "class")
+
+########################################################################
+#EX Visualizing Classification Trees
+
+# Examine the loan_model object
+loan_model
+
+# Load the rpart.plot package
+library(rpart.plot)
+
+# Plot the loan_model with default settings
+rpart.plot(loan_model)
+
+# Plot the loan_model with customized settings
+rpart.plot(loan_model, type = 3, box.palette = c("red", "green"), fallen.leaves = TRUE)
+
+########################################################################
+#Evaluating Larger Trees
+########################################################################
+
+# The 'rpart' package is loaded into the workspace
+# The loans_train and loans_test datasets have been created
+
+# Grow a tree using all of the available applicant data
+loan_model <- rpart(outcome~., data = loans_train, method = "class", control = rpart.control(cp = 0))
+
+# Make predictions on the test dataset
+loans_test$pred <- predict(loan_model, loans_test, type = "class")
+
+# Examine the confusion matrix
+table(loans_test$pred, loans_test$outcome)
+
+# Compute the accuracy on the test dataset
+mean(loans_test$pred == loans_test$outcome)
+
+########################################################################
+#Pruning Strategies (not too large, not too small)
+########################################################################
+#Pre-pruning
+#stopping process early, stops at predefined depth for tree
+#or minimum number of observations at a node or else tree splitting stops
+
+#Post-Pruning
+#remove the nodes after the fact because its presence didn't substantially improve accuracy
+
+#pre-pruning with rpart
+library(rpart)
+prune_control <- rpart.control(maxdepth = 30, minsplit = 20) #use EITHER maxdepth or minsplit
+m <- rpart(repaid ~ credit_score + request_amt, data = loans, method = "class", control = prune_control)
+
+#post-pruning with rpart
+m <- rpart(repaid ~ credit_score + request_amt, data = loans, method = "Class")
+plotcp(m) #generate error vs complexity, and helps you get cp (cut-point for pruning)
+m_pruned <- prune(m, cp = 0.20)
+
+
+########################################################################
+#EX pre-pruning
+
+# The 'rpart' package is loaded into the workspace
+
+# Grow a tree with maxdepth of 6
+loan_model <- rpart(outcome~., data = loans_train, method = "class", control = rpart.control(cp = 0, maxdepth = 6))
+
+# Compute the accuracy of the simpler tree
+loans_test$pred <- predict(loan_model, newdata = loans_test, type = "class")
+mean(loans_test$pred == loans_test$outcome)
+
+# Grow a tree with minsplit of 500
+loan_model2 <- rpart(outcome~., data = loans_train, method = "class", control = rpart.control(cp = 0, minsplit = 500))
+
+# Compute the accuracy of the simpler tree
+loans_test$pred2 <- predict(loan_model2, newdata = loans_test, type = "class")
+mean(loans_test$pred2 == loans_test$outcome)
+
+########################################################################
+#EX post-pruning https://www.statmethods.net/advstats/cart.html
+
+# The 'rpart' package is loaded into the workspace
+
+# Grow an overly complex tree
+loan_model <- rpart(outcome~., data = loans_train, method = "class", control = rpart.control(cp = 0))
+
+# Examine the complexity plot
+plotcp(loan_model)
+
+# Prune the tree
+loan_model_pruned <- prune(loan_model, cp = 0.0014) #this xp minmizes xerror in printcp(model)
+
+# Compute the accuracy of the pruned tree
+loans_test$pred <- predict(loan_model_pruned, newdata = loans_test, type ="class")
+mean(loans_test$pred == loans_test$outcome)
+
+########################################################################
+#Forests (features and examples differ from tree to tree)
+########################################################################
+# building a simple random forest
+library(randomForest)
+m <- randomForest(repaid ~ credit_score + request_amt, data = loans,
+                  ntree = 500,    # number of trees in the forest
+                  mtry = sqrt(p)) # number of predictors (p) per tree
+
+# making predictions from a random forest
+p <- predict(m, test_data)
+
+########################################################################
+#EX
+
+# Load the randomForest package
+library(randomForest)
+
+# Build a random forest model
+loan_model <- randomForest(outcome~., data = loans_train)
+
+# Compute the accuracy of the random forest
+loans_test$pred <- predict(loan_model, newdata = loans_test)
+mean(loans_test$pred == loans_test$outcome)
